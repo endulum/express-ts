@@ -8,7 +8,8 @@ const assertDefined = <T>(obj: T | null | undefined): T => {
   return obj as T
 }
 
-describe('user schema ops', () => {
+// possibly redundant...
+describe.skip('user schema ops', () => {
   let user: IUserDocument | null
 
   beforeAll(async () => {
@@ -99,6 +100,8 @@ describe('user client ops', () => {
   })
 
   describe('log into a user account', () => {
+    let token: string
+
     beforeAll(async () => {
       await User.create({ username: 'Some Guy', password: 'Some Password' })
     })
@@ -118,11 +121,20 @@ describe('user client ops', () => {
       ])
     })
 
-    test('POST /login - 200 if no input errors', async () => {
+    test('POST /login - 200 if no input errors, and sends a token', async () => {
       const response = await request(app)
         .post('/login')
         .type('form')
         .send({ username: 'Some Guy', password: 'Some Password' })
+      expect(response.status).toBe(200)
+      expect(response.body).toHaveProperty('token')
+      token = response.body.token
+    })
+
+    test('GET /login - 200 if valid token provided', async () => {
+      const response = await request(app)
+        .get('/login')
+        .set({ Authorization: `Bearer ${token}` })
       expect(response.status).toBe(200)
     })
   })

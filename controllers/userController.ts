@@ -1,7 +1,12 @@
 import { type RequestHandler } from 'express'
+import jsonwebtoken, { type JwtPayload } from 'jsonwebtoken'
 import asyncHandler from 'express-async-handler'
 import { type ValidationChain, body, validationResult } from 'express-validator'
 import User from '../models/user'
+
+interface IJwtPayload extends jsonwebtoken.JwtPayload {
+  id: string
+}
 
 const sendErrorsIfAny = asyncHandler(async (req, res, next) => {
   const errorsArray = validationResult(req).array()
@@ -22,6 +27,24 @@ const sendErrorsIfAny = asyncHandler(async (req, res, next) => {
 
 const userController: Record<string, RequestHandler | Array<RequestHandler | ValidationChain>> = {}
 
+userController.authenticate = asyncHandler(async (req, res, next) => {
+  const bearerHeader = req.headers.authorization
+  const bearerToken = bearerHeader?.split(' ')[1]
+  if (bearerToken === undefined) res.status(401).send('Please log in.')
+  else {
+    let decoded
+    try {
+      decoded = jsonwebtoken.verify(bearerToken, 'secret') as IJwtPayload
+      const user = await User.findByNameOrId(decoded.id)
+      if (user === null) res.status(404).send('The user this token belongs to could not be found.')
+      req.authenticatedUser = user
+      next()
+    } catch (err) {
+      res.status(403).send('Token could not be verified.')
+    }
+  }
+})
+
 userController.doesUserExist = asyncHandler(async (req, res, next) => {
   const user = await User.findByNameOrId(req.params.id)
   if (user === null) res.status(404).send('User not found.')
@@ -38,7 +61,7 @@ userController.getUser = [
   })
 ]
 
-const signupValidation = [
+userController.signUp = [
   body('username')
     .trim()
     .isLength({ min: 1 }).withMessage('Please input a username.').bail()
@@ -54,10 +77,20 @@ const signupValidation = [
     .trim()
     .isLength({ min: 1 }).withMessage('Please input a password.').bail()
     .isLength({ min: 8 }).withMessage('Passwords must be at least 8 characters long.')
-    .escape()
+    .escape(),
+
+  sendErrorsIfAny,
+
+  asyncHandler(async (req, res) => {
+    await User.create({
+      username: req.body.username,
+      password: req.body.password
+    })
+    res.sendStatus(200)
+  })
 ]
 
-const loginValidation = [
+userController.logIn = [
   body('username')
     .isLength({ min: 1 }).withMessage('Please input a username.').bail()
     .escape(),
@@ -69,29 +102,20 @@ const loginValidation = [
     .custom(async (value: string, { req }) => {
       const existingUser = await User.findByNameOrId(req.body.username as string)
       if (existingUser === null) return await Promise.reject(new Error())
-      const match = await existingUser.checkPassword(value)
+      req.loggingInUser = existingUser
+      const match: boolean = await req.loggingInUser.checkPassword(value)
       return match ? true : await Promise.reject(new Error())
     }).withMessage('Incorrect username or password.')
-    .escape()
-]
+    .escape(),
 
-userController.signUp = [
-  ...signupValidation,
   sendErrorsIfAny,
-  asyncHandler(async (req, res) => {
-    await User.create({
-      username: req.body.username,
-      password: req.body.password
-    })
-    res.sendStatus(200)
-  })
-]
 
-userController.logIn = [
-  ...loginValidation,
-  sendErrorsIfAny,
   asyncHandler(async (req, res) => {
-    res.sendStatus(200)
+    const token = jsonwebtoken.sign(
+      { username: req.loggingInUser.username, id: req.loggingInUser.id },
+      'secret' // MAKE THIS ACTUALLY SECRET
+    )
+    res.status(200).json({ token })
   })
 ]
 
