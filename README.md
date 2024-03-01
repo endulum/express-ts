@@ -9,7 +9,6 @@ A template for a TypeScript backend. Designed to work with the [Frontend Templat
 
 ## Todo
 - Consider adding JWT refreshing
-- Allow users to change their username and password
 - Enforce user `username` length and character validation on both model and controller
 - Enable server to run outside of testing
 - Create Frontend Template repo and link here

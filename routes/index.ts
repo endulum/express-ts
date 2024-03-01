@@ -6,6 +6,12 @@ const router = express.Router()
 
 router.route('/user/:id')
   .get(userController.getUser)
+  .put(
+    userController.authenticate,
+    userController.doesUserExist,
+    userController.areYouThisUser,
+    userController.editUser
+  )
 
 router.route('/signup')
   .post(userController.signUp)

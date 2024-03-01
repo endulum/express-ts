@@ -1,5 +1,5 @@
 import { type RequestHandler } from 'express'
-import jsonwebtoken, { type JwtPayload } from 'jsonwebtoken'
+import jsonwebtoken from 'jsonwebtoken'
 import asyncHandler from 'express-async-handler'
 import { type ValidationChain, body, validationResult } from 'express-validator'
 import User from '../models/user'
@@ -54,6 +54,11 @@ userController.doesUserExist = asyncHandler(async (req, res, next) => {
   }
 })
 
+userController.areYouThisUser = asyncHandler(async (req, res, next) => {
+  if (req.requestedUser.id !== req.authenticatedUser.id) res.status(403).send('You are not this user.')
+  next()
+})
+
 userController.getUser = [
   userController.doesUserExist,
   asyncHandler(async (req, res) => {
@@ -61,17 +66,26 @@ userController.getUser = [
   })
 ]
 
+const usernameValidation = body('username')
+  .trim()
+  .isLength({ min: 1 }).withMessage('Please input a username.').bail()
+  .custom(async (value: string, { req }) => {
+    const existingUser = await User.findByNameOrId(value)
+    if (existingUser !== null) {
+      if (
+        req.authenticatedUser !== null &&
+        req.authenticatedUser.id === existingUser.id
+      ) { // only when logged in and choosing a new username
+        return true
+      } return await Promise.reject(new Error())
+    } return true
+  }).withMessage('A user already exists with this username.').bail()
+// .isLength({ min: 2, max: 32 }).withMessage('Usernames must be between 2 and 32 characters long.').bail()
+// .matches(/^[a-z0-9-]$/).withMessage('Usernames must only have letters, numbers, and hyphens.')
+  .escape()
+
 userController.signUp = [
-  body('username')
-    .trim()
-    .isLength({ min: 1 }).withMessage('Please input a username.').bail()
-    .custom(async (value: string, { req }) => {
-      const existingUser = await User.findByNameOrId(value)
-      return existingUser !== null ? await Promise.reject(new Error()) : true
-    }).withMessage('A user already exists with this username.').bail()
-    // .isLength({ min: 2, max: 32 }).withMessage('Usernames must be between 2 and 32 characters long.').bail()
-    // .matches(/^[a-z0-9-]$/).withMessage('Usernames must only have letters, numbers, and hyphens.')
-    .escape(),
+  usernameValidation,
 
   body('password')
     .trim()
@@ -119,10 +133,38 @@ userController.logIn = [
   })
 ]
 
-// changing user detail
-// usernames: same validation as signing up (usernames)
-// new passwords: same validation as signing up (passwords)
-// confirm passwords: same validation as logging in (passwords)
-// - ONLY if new password is provided
+userController.editUser = [
+  usernameValidation,
+
+  body('newPassword')
+    .trim()
+    .custom(async value => {
+      if (value.length > 0 && value.length < 8) return await Promise.reject(new Error())
+      return true
+    }).withMessage('New password must be 8 or more characters long.')
+    .escape(),
+
+  body('confirmPassword')
+    .trim()
+    .custom(async (value, { req }) => {
+      return (req.body.newPassword !== '' && value.length === 0) ? await Promise.reject(new Error()) : true
+    }).withMessage('Please confirm your current password.').bail()
+    .custom(async (value, { req }) => {
+      if (req.body.newPassword !== '') {
+        const match: boolean = await req.authenticatedUser.checkPassword(value)
+        return match ? true : await Promise.reject(new Error())
+      }
+    }).withMessage('Incorrect password.')
+    .escape(),
+
+  sendErrorsIfAny,
+
+  asyncHandler(async (req, res) => {
+    req.authenticatedUser.username = req.body.username
+    if (req.body.newPassword !== '') req.authenticatedUser.password = req.body.newPassword
+    await req.authenticatedUser.save()
+    res.sendStatus(200)
+  })
+]
 
 export default userController
