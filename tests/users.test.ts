@@ -44,13 +44,7 @@ describe('user client ops', () => {
 
   beforeAll(async () => {
     await User.create({ username: 'demo-user-1', password: 'password' })
-    // const user = await User.findByNameOrId('demo-user-1')
-    // console.log(user)
   })
-
-  // test('does not explode', () => {
-  //   expect(2).toBe(2)
-  // })
 
   describe('auth', () => {
     const correctDetails = { username: 'demo-user-2', password: 'password', confirmPassword: 'password' }
