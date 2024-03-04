@@ -1,5 +1,5 @@
 import './mongoConfigTesting'
-import { assertDefined, reqShort, validationLoop } from './helpers'
+import { assertDefined, reqShort, ValidationLoopWrapper } from './helpers'
 import User, { type IUserDocument } from '../models/user'
 
 describe('user client ops', () => {
@@ -24,22 +24,17 @@ describe('user client ops', () => {
     }
 
     describe('sign up for an account', () => {
-      const validationLoopCall = async (
-        fieldName: string,
-        errorArray: Array<{ value: string, msg: string }>
-      ): Promise<void> => {
-        await validationLoop(
-          fieldName, errorArray,
-          correctDetails, '/signup', 'post', null
-        )
-      }
+      let signupLoop: ValidationLoopWrapper
+      beforeAll(() => {
+        signupLoop = new ValidationLoopWrapper(correctDetails, '/signup', 'post', null)
+      })
 
       test('POST /signup - 422 if input error (username)', async () => {
-        await validationLoopCall('username', usernameErrors)
+        await signupLoop.call('username', usernameErrors)
       })
 
       test('POST /signup - 422 if input error (password)', async () => {
-        await validationLoopCall(
+        await signupLoop.call(
           'password',
           [
             { value: '', msg: 'Please enter a password.' },
@@ -49,7 +44,7 @@ describe('user client ops', () => {
       })
 
       test('POST /signup - 422 if input error (confirm password)', async () => {
-        await validationLoopCall(
+        await signupLoop.call(
           'confirmPassword',
           [
             { value: '', msg: 'Please confirm your password.' },
@@ -67,25 +62,20 @@ describe('user client ops', () => {
     })
 
     describe('log into an account', () => {
-      const validationLoopCall = async (
-        fieldName: string,
-        errorArray: Array<{ value: string, msg: string }>
-      ): Promise<void> => {
-        await validationLoop(
-          fieldName, errorArray,
-          correctDetails, '/login', 'post', null
-        )
-      }
+      let loginLoop: ValidationLoopWrapper
+      beforeAll(() => {
+        loginLoop = new ValidationLoopWrapper(correctDetails, '/login', 'post', null)
+      })
 
       test('POST /login - 422 if input error (username)', async () => {
-        await validationLoopCall(
+        await loginLoop.call(
           'username',
           [{ value: '', msg: 'Please enter a username.' }]
         )
       })
 
       test('POST /login - 422 if input error (password)', async () => {
-        await validationLoopCall(
+        await loginLoop.call(
           'password',
           [
             { value: '', msg: 'Please enter a password.' },
@@ -143,14 +133,10 @@ describe('user client ops', () => {
       currentPassword: 'password'
     }
 
-    const validationLoopCall = async (
-      fieldName: string,
-      errorArray: Array<{ value: string, msg: string }>
-    ): Promise<void> => {
-      await validationLoop(
-        fieldName, errorArray,
-        correctDetails, '/user/demo-user-2', 'put', token)
-    }
+    let editUserLoop: ValidationLoopWrapper
+    beforeAll(() => {
+      editUserLoop = new ValidationLoopWrapper(correctDetails, '/user/demo-user-2', 'put', token)
+    })
 
     test('POST /user/:id - 404 if target user does not exist', async () => {
       const response = await reqShort('/user/demo-user-0', 'put', token, {})
@@ -163,18 +149,18 @@ describe('user client ops', () => {
     })
 
     test('POST /user/:id - 422 if input error (username)', async () => {
-      await validationLoopCall('username', usernameErrors)
+      await editUserLoop.call('username', usernameErrors)
     })
 
     test('POST /user/:id - 422 if input error (new password)', async () => {
-      await validationLoopCall(
+      await editUserLoop.call(
         'newPassword',
         [{ value: 'a', msg: 'New password must be 8 or more characters long.' }]
       )
     })
 
     test('POST /user/:id - 422 if input error (confirm new password)', async () => {
-      await validationLoopCall(
+      await editUserLoop.call(
         'confirmNewPassword',
         [
           { value: '', msg: 'Please confirm your new password.' },
@@ -184,7 +170,7 @@ describe('user client ops', () => {
     })
 
     test('POST /user/:id - 422 if input error (current password)', async () => {
-      await validationLoopCall(
+      await editUserLoop.call(
         'currentPassword',
         [
           { value: '', msg: 'Please input your current password in order to use your new password.' },

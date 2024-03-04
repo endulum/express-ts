@@ -50,3 +50,33 @@ export const validationLoop = async (
     expect(response.body.errors).toEqual([{ ...error, path: fieldName }])
   }))
 }
+
+// in describe blocks were the details, url, method, and token will always be the same,
+// this wrapper does away with the four repetitive arguments, leaving only two
+export class ValidationLoopWrapper {
+  correctDetails: Record<string, string>
+  reqUrl: string
+  reqMethod: string
+  reqToken: string | null
+
+  constructor (
+    correctDetails: Record<string, string>,
+    reqUrl: string,
+    reqMethod: string,
+    reqToken: string | null
+  ) {
+    this.correctDetails = correctDetails
+    this.reqUrl = reqUrl
+    this.reqMethod = reqMethod
+    this.reqToken = reqToken
+  }
+
+  async call (
+    fieldName: string,
+    errorArray: Array<{ value: string, msg: string }>
+  ): Promise<void> {
+    await validationLoop(
+      fieldName, errorArray, this.correctDetails, this.reqUrl, this.reqMethod, this.reqToken
+    )
+  }
+}
