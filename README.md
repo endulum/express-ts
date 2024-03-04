@@ -13,5 +13,5 @@ This template comes with a User object model and controller, and endpoints for u
 ## Todo
 - Generate an _actually_ secret secret for password decrypting/encrypting
 - Consider adding JWT refreshing
-- Enable server to run outside of testing
 - Create Frontend Template repo and link here
+- Improve error handling

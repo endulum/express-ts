@@ -6,7 +6,7 @@
   "scripts": {
     "test": "jest --watch",
     "start": "node dist/app.js",
-    "dev": "nodemon app.ts"
+    "dev": "nodemon --exec 'ts-node --files' app.ts"
   },
   "keywords": [],
   "author": "",
