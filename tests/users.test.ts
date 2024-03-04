@@ -1,4 +1,4 @@
-import request from 'supertest'
+import request, { type Response } from 'supertest'
 import app from './appTesting'
 import './mongoConfigTesting'
 import User, { type IUserDocument } from '../models/user'
@@ -8,194 +8,205 @@ const assertDefined = <T>(obj: T | null | undefined): T => {
   return obj as T
 }
 
-// possibly redundant...
-describe.skip('user schema ops', () => {
-  let user: IUserDocument | null
-
-  beforeAll(async () => {
-    await User.create({ username: 'First User', password: 'Cool Password' })
-  })
-
-  afterAll(async () => {
-    await User.deleteMany({})
-  })
-
-  test('user can be found by username', async () => {
-    user = await User.findByNameOrId('First User')
-    user = assertDefined(user)
-  })
-
-  test('user password is hashed and can be matched', async () => {
-    user = assertDefined<IUserDocument>(user)
-    const match = await user.checkPassword('Cool Password')
-    expect(match).toBe(true)
-  })
-
-  test('can safely change user password', async () => {
-    user = assertDefined<IUserDocument>(user)
-    const newPassword = 'Even Cooler Password'
-    user.password = newPassword
-    await user.save()
-    const match = await user.checkPassword(newPassword)
-    expect(match).toBe(true)
-  })
-})
+const reqShort = async (
+  url: string,
+  method?: string | null,
+  token?: string | null,
+  form?: Record<string, string> | null
+): Promise<Response> => {
+  switch (method) {
+    case 'post': return await request(app)
+      .post(url)
+      .set({ Authorization: token !== null ? `Bearer ${token}` : '' })
+      .type('form').send(form ?? {})
+    case 'put': return await request(app)
+      .put(url)
+      .set({ Authorization: token !== null ? `Bearer ${token}` : '' })
+      .type('form').send(form ?? {})
+    case 'delete': return await request(app)
+      .delete(url)
+      .set({ Authorization: token !== null ? `Bearer ${token}` : '' })
+    default: return await request(app)
+      .get(url)
+      .set({ Authorization: token !== null ? `Bearer ${token}` : '' })
+  }
+}
 
 describe('user client ops', () => {
   let token: string
 
+  const usernameErrors = [
+    { value: '', msg: 'Please enter a username.' },
+    { value: 'a', msg: 'Username must be between 2 and 32 characters long.' },
+    { value: '&&&&', msg: 'Username must only consist of letters, numbers, and hyphens.' },
+    { value: 'demo-user-1', msg: 'A user already exists with this username.' }
+  ]
+
+  beforeAll(async () => {
+    await User.create({ username: 'demo-user-1', password: 'password' })
+    // const user = await User.findByNameOrId('demo-user-1')
+    // console.log(user)
+  })
+
+  // test('does not explode', () => {
+  //   expect(2).toBe(2)
+  // })
+
+  describe('auth', () => {
+    const correctDetails = { username: 'demo-user-2', password: 'password' }
+
+    describe('sign up for an account', () => {
+      test('POST /signup - 422 if input error (username)', async () => {
+        await Promise.all(usernameErrors.map(async usernameError => {
+          const response = await reqShort('/signup', 'post', null, {
+            ...correctDetails, username: usernameError.value
+          })
+          expect(response.status).toBe(422)
+          expect(response.body.errors).toEqual([{ ...usernameError, path: 'username' }])
+        }))
+      })
+
+      test('POST /signup - 422 if input error (password)', async () => {
+        await Promise.all([
+          { value: '', msg: 'Please enter a password.' },
+          { value: 'a', msg: 'Password must be at least 8 characters long.' }
+        ].map(async passwordError => {
+          const response = await reqShort('/signup', 'post', null, {
+            ...correctDetails, password: passwordError.value
+          })
+          expect(response.status).toBe(422)
+          expect(response.body.errors).toEqual([{ ...passwordError, path: 'password' }])
+        }))
+      })
+
+      test('POST /signup - 200 and new account created', async () => {
+        const response = await reqShort('/signup', 'post', null, correctDetails)
+        expect(response.status).toBe(200)
+        const user = await User.findByNameOrId('demo-user-2')
+        expect(user).toBeDefined()
+      })
+    })
+
+    describe('log into an account', () => {
+      test('POST /login - 422 if input error (username)', async () => {
+        const response = await reqShort('/login', 'post', null, {
+          ...correctDetails, username: ''
+        })
+        expect(response.status).toBe(422)
+        expect(response.body.errors).toEqual([{
+          path: 'username', value: '', msg: 'Please enter a username.'
+        }])
+      })
+
+      test('POST /login - 422 if input error (password)', async () => {
+        await Promise.all([
+          { value: '', msg: 'Please enter a password.' },
+          { value: 'blah', msg: 'Incorrect username or password.' }
+        ].map(async passwordError => {
+          const response = await reqShort('/login', 'post', null, {
+            ...correctDetails, password: passwordError.value
+          })
+          expect(response.status).toBe(422)
+          expect(response.body.errors).toEqual([{ ...passwordError, path: 'password' }])
+        }))
+      })
+
+      test('POST /login - 200 and token given', async () => {
+        const response = await reqShort('/login', 'post', null, correctDetails)
+        expect(response.status).toBe(200)
+        expect(response.body).toHaveProperty('token')
+        token = response.body.token
+      })
+    })
+
+    describe('access a protected endpoint', () => {
+      test('GET /login - 401 if no token provided', async () => {
+        const response = await reqShort('/login', 'get', null, {})
+        expect(response.status).toBe(401)
+      })
+
+      test('GET /login - 403 if malformed token', async () => {
+        const response = await reqShort('/login', 'get', 'blah', {})
+        expect(response.status).toBe(403)
+      })
+
+      test('GET /login - 200 and returns user identification details', async () => {
+        const response = await reqShort('/login', 'get', token, {})
+        expect(response.status).toBe(200)
+        expect(response.body).toHaveProperty('username')
+        expect(response.body).toHaveProperty('id')
+      })
+    })
+  })
+
   describe('view a user profile', () => {
-    let user: IUserDocument
-
-    beforeAll(async () => {
-      user = await User.create({ username: 'Some Guy', password: 'Some Password' })
-    })
-
-    afterAll(async () => {
-      await User.deleteMany({})
-    })
-
-    test('GET /user/:id - 200 if user exists', async () => {
-      const response = await request(app)
-        .get(`/user/${user.username}`)
-      expect(response.status).toBe(200)
-      expect(response.body).toEqual({ username: user.username })
-    })
-
     test('GET /user/:id - 404 if user does not exist', async () => {
-      const response = await request(app)
-        .get('/user/Nonexistent Guy')
+      const response = await reqShort('/user/demo-user-0', 'get')
       expect(response.status).toBe(404)
     })
-  })
 
-  describe('create a user account', () => {
-    beforeAll(async () => {
-      await User.create({ username: 'Some Guy', password: 'Some Password' })
-    })
-
-    afterAll(async () => {
-      await User.deleteMany({})
-    })
-
-    test('POST /signup - 422 if input errors (username taken)', async () => {
-      const response = await request(app)
-        .post('/signup')
-        .type('form')
-        .send({ username: 'Some Guy', password: 'Cool Password' })
-      expect(response.status).toBe(422)
-      expect(response.body.errors).toEqual([
-        { path: 'username', value: 'Some Guy', msg: 'A user already exists with this username.' }
-      ])
-    })
-
-    test('POST /signup - 200 if no input errors, and creates an account', async () => {
-      const response = await request(app)
-        .post('/signup')
-        .type('form')
-        .send({ username: 'New Guy', password: 'Cool Password' })
+    test('GET /user/:id - 200 and returns user details', async () => {
+      const response = await reqShort('/user/demo-user-2', 'get')
       expect(response.status).toBe(200)
-
-      const users = await User.find({})
-      expect(users.length).toBe(2)
-    })
-  })
-
-  describe('log into a user account', () => {
-    beforeAll(async () => {
-      await User.create({ username: 'Some Guy', password: 'Some Password' })
-    })
-
-    test('POST /login - 422 if input errors (wrong password)', async () => {
-      const response = await request(app)
-        .post('/login')
-        .type('form')
-        .send({ username: 'Some Guy', password: 'Wrong Password' })
-      expect(response.status).toBe(422)
-      expect(response.body.errors).toEqual([
-        { path: 'password', value: 'Wrong Password', msg: 'Incorrect username or password.' }
-      ])
-    })
-
-    test('POST /login - 200 if no input errors, and sends a token', async () => {
-      const response = await request(app)
-        .post('/login')
-        .type('form')
-        .send({ username: 'Some Guy', password: 'Some Password' })
-      expect(response.status).toBe(200)
-      expect(response.body).toHaveProperty('token')
-      token = response.body.token
-    })
-
-    test('GET /login - 200 if valid token provided', async () => {
-      const response = await request(app)
-        .get('/login')
-        .set({ Authorization: `Bearer ${token}` })
-      expect(response.status).toBe(200)
+      expect(response.body).toHaveProperty('username')
     })
   })
 
   describe('change own user account details', () => {
-    beforeAll(async () => {
-      await User.create({ username: 'Some Other Guy', password: 'Some Password' })
+    const correctDetails = {
+      username: 'cool-username', newPassword: 'coolNewPassword', confirmPassword: 'password'
+    }
+
+    test('POST /user/:id - 404 if target user does not exist', async () => {
+      const response = await reqShort('/user/demo-user-0', 'put', token, {})
+      expect(response.status).toBe(404)
     })
 
-    afterAll(async () => {
-      await User.deleteMany({})
+    test('POST /user/:id - 403 if target user != authenticated user', async () => {
+      const response = await reqShort('/user/demo-user-1', 'put', token, {})
+      expect(response.status).toBe(403)
     })
 
-    test('POST /user/:id - 422 if input errors (new username taken)', async () => {
-      const response = await request(app)
-        .put('/user/Some Guy')
-        .set({ Authorization: `Bearer ${token}` })
-        .type('form')
-        .send({ username: 'Some Other Guy' })
-      expect(response.status).toBe(422)
-
-      expect(response.body.errors).toEqual([
-        { path: 'username', value: 'Some Other Guy', msg: 'A user already exists with this username.' }
-      ])
-    })
-
-    test('POST /user/:id - 422 if input errors (new password provided, but wrong conf password)', async () => {
-      const response = await request(app)
-        .put('/user/Some Guy')
-        .set({ Authorization: `Bearer ${token}` })
-        .type('form')
-        .send({ username: 'Some Guy', newPassword: 'Better Password' })
-      expect(response.status).toBe(422)
-      expect(response.body.errors).toEqual([
-        { path: 'confirmPassword', value: '', msg: 'Please confirm your current password.' }
-      ])
-    })
-
-    test('POST /user/:id - 200 and changes username', async () => {
-      const response = await request(app)
-        .put('/user/Some Guy')
-        .set({ Authorization: `Bearer ${token}` })
-        .type('form')
-        .send({ username: 'Cool Guy' })
-      expect(response.status).toBe(200)
-      expect(response.body).not.toHaveProperty('errors')
-      const thisUser = await User.findByNameOrId('Cool Guy')
-      expect(thisUser).not.toBe(null)
-    })
-
-    test('POST /user/:id - 200 and changes password', async () => {
-      const response = await request(app)
-        .put('/user/Cool Guy')
-        .set({ Authorization: `Bearer ${token}` })
-        .type('form')
-        .send({
-          username: 'Cool Guy',
-          newPassword: 'Cool Password',
-          confirmPassword: 'Some Password'
+    test('POST /user/:id - 422 if input error (username)', async () => {
+      await Promise.all(usernameErrors.map(async usernameError => {
+        const response = await reqShort('/user/demo-user-2', 'put', token, {
+          username: usernameError.value
         })
+        expect(response.status).toBe(422)
+        expect(response.body.errors).toEqual([{ ...usernameError, path: 'username' }])
+      }))
+    })
+
+    test('POST /user/:id - 422 if input error (new password)', async () => {
+      const response = await reqShort('/user/demo-user-2', 'put', token, {
+        ...correctDetails, newPassword: 'a'
+      })
+      expect(response.status).toBe(422)
+      expect(response.body.errors).toEqual([{
+        path: 'newPassword', value: 'a', msg: 'New password must be 8 or more characters long.'
+      }])
+    })
+
+    test('POST /user/:id - 422 if input error (confirm password)', async () => {
+      await Promise.all([
+        { value: '', msg: 'Please confirm your current password.' },
+        { value: 'blah', msg: 'Incorrect password.' }
+      ].map(async passwordError => {
+        const response = await reqShort('/user/demo-user-2', 'put', token, {
+          ...correctDetails, confirmPassword: passwordError.value
+        })
+        expect(response.status).toBe(422)
+        expect(response.body.errors).toEqual([{ ...passwordError, path: 'confirmPassword' }])
+      }))
+    })
+
+    test('POST /user/:id - 200 and safely changes account details', async () => {
+      const response = await reqShort('/user/demo-user-2', 'put', token, correctDetails)
       expect(response.status).toBe(200)
-      expect(response.body).not.toHaveProperty('errors')
-      const thisUser = await User.findByNameOrId('Cool Guy')
-      expect(thisUser).not.toBe(null)
-      expect(await thisUser.checkPassword('Cool Password')).toBe(true)
+      let user = await User.findByNameOrId('cool-username')
+      user = assertDefined<IUserDocument>(user)
+      const match = await user.checkPassword(correctDetails.newPassword)
+      expect(match).toBe(true)
     })
   })
 })

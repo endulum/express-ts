@@ -16,7 +16,7 @@ interface IUserModel extends Model<IUserDocument> {
 }
 
 const UserSchema = new Schema<IUserDocument>({
-  username: { type: String, required: true },
+  username: { type: String, required: true, match: /^[a-z0-9-]+$/g },
   password: { type: String, required: true }
 })
 

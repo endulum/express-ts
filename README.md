@@ -5,10 +5,10 @@ A template for a TypeScript backend. Designed to work with the [Frontend Templat
 - Express as the server framework
 - MongoDB as the server database
 - Style enforced with ESLint ("Standard with TypeScript")
-- Functionality enforced with Jest testing
+- Functionality enforced with Jest + Supertest testing
 
 ## Todo
+- Password change: add `confirmNewPassword` field, rename `confirmPassword` to `currentPassword`
 - Consider adding JWT refreshing
-- Enforce user `username` length and character validation on both model and controller
 - Enable server to run outside of testing
 - Create Frontend Template repo and link here

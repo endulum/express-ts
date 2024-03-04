@@ -37,8 +37,10 @@ userController.authenticate = asyncHandler(async (req, res, next) => {
       decoded = jsonwebtoken.verify(bearerToken, 'secret') as IJwtPayload
       const user = await User.findByNameOrId(decoded.id)
       if (user === null) res.status(404).send('The user this token belongs to could not be found.')
-      req.authenticatedUser = user
-      next()
+      else {
+        req.authenticatedUser = user
+        next()
+      }
     } catch (err) {
       res.status(403).send('Token could not be verified.')
     }
@@ -55,8 +57,9 @@ userController.doesUserExist = asyncHandler(async (req, res, next) => {
 })
 
 userController.areYouThisUser = asyncHandler(async (req, res, next) => {
-  if (req.requestedUser.id !== req.authenticatedUser.id) res.status(403).send('You are not this user.')
-  next()
+  if (req.requestedUser.id !== req.authenticatedUser.id) {
+    res.status(403).send('You are not this user.')
+  } else next()
 })
 
 userController.getUser = [
@@ -68,7 +71,9 @@ userController.getUser = [
 
 const usernameValidation = body('username')
   .trim()
-  .isLength({ min: 1 }).withMessage('Please input a username.').bail()
+  .isLength({ min: 1 }).withMessage('Please enter a username.').bail()
+  .isLength({ min: 2, max: 32 }).withMessage('Username must be between 2 and 32 characters long.').bail()
+  .matches(/^[a-z0-9-]+$/g).withMessage('Username must only consist of letters, numbers, and hyphens.').bail()
   .custom(async (value: string, { req }) => {
     const existingUser = await User.findByNameOrId(value)
     if (existingUser !== null) {
@@ -80,8 +85,6 @@ const usernameValidation = body('username')
       } return await Promise.reject(new Error())
     } return true
   }).withMessage('A user already exists with this username.').bail()
-// .isLength({ min: 2, max: 32 }).withMessage('Usernames must be between 2 and 32 characters long.').bail()
-// .matches(/^[a-z0-9-]$/).withMessage('Usernames must only have letters, numbers, and hyphens.')
   .escape()
 
 userController.signUp = [
@@ -89,8 +92,8 @@ userController.signUp = [
 
   body('password')
     .trim()
-    .isLength({ min: 1 }).withMessage('Please input a password.').bail()
-    .isLength({ min: 8 }).withMessage('Passwords must be at least 8 characters long.')
+    .isLength({ min: 1 }).withMessage('Please enter a password.').bail()
+    .isLength({ min: 8 }).withMessage('Password must be at least 8 characters long.')
     .escape(),
 
   sendErrorsIfAny,
@@ -106,13 +109,13 @@ userController.signUp = [
 
 userController.logIn = [
   body('username')
-    .isLength({ min: 1 }).withMessage('Please input a username.').bail()
+    .isLength({ min: 1 }).withMessage('Please enter a username.').bail()
     .escape(),
 
   sendErrorsIfAny,
 
   body('password')
-    .isLength({ min: 1 }).withMessage('Please input a password.')
+    .isLength({ min: 1 }).withMessage('Please enter a password.').bail()
     .custom(async (value: string, { req }) => {
       const existingUser = await User.findByNameOrId(req.body.username as string)
       if (existingUser === null) return await Promise.reject(new Error())
