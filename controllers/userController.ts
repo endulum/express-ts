@@ -98,6 +98,16 @@ userController.signUp = [
 
   sendErrorsIfAny,
 
+  body('confirmPassword')
+    .trim()
+    .isLength({ min: 1 }).withMessage('Please confirm your password.').bail()
+    .custom(async (value, { req }) => {
+      return value === req.body.password ? true : await Promise.reject(new Error())
+    }).withMessage('Both passwords do not match.')
+    .escape(),
+
+  sendErrorsIfAny,
+
   asyncHandler(async (req, res) => {
     await User.create({
       username: req.body.username,
@@ -147,11 +157,23 @@ userController.editUser = [
     }).withMessage('New password must be 8 or more characters long.')
     .escape(),
 
-  body('confirmPassword')
+  sendErrorsIfAny,
+
+  body('confirmNewPassword')
     .trim()
     .custom(async (value, { req }) => {
       return (req.body.newPassword !== '' && value.length === 0) ? await Promise.reject(new Error()) : true
-    }).withMessage('Please confirm your current password.').bail()
+    }).withMessage('Please confirm your new password.').bail()
+    .custom(async (value, { req }) => {
+      return value === req.body.newPassword ? true : await Promise.reject(new Error())
+    }).withMessage('Both passwords do not match.')
+    .escape(),
+
+  body('currentPassword')
+    .trim()
+    .custom(async (value, { req }) => {
+      return (req.body.newPassword !== '' && value.length === 0) ? await Promise.reject(new Error()) : true
+    }).withMessage('Please input your current password in order to use your new password.').bail()
     .custom(async (value, { req }) => {
       if (req.body.newPassword !== '') {
         const match: boolean = await req.authenticatedUser.checkPassword(value)

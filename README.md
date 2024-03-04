@@ -8,7 +8,7 @@ A template for a TypeScript backend. Designed to work with the [Frontend Templat
 - Functionality enforced with Jest + Supertest testing
 
 ## Todo
-- Password change: add `confirmNewPassword` field, rename `confirmPassword` to `currentPassword`
+- Generate an _actually_ secret secret for password decrypting/encrypting
 - Consider adding JWT refreshing
 - Enable server to run outside of testing
 - Create Frontend Template repo and link here

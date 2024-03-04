@@ -53,7 +53,7 @@ describe('user client ops', () => {
   // })
 
   describe('auth', () => {
-    const correctDetails = { username: 'demo-user-2', password: 'password' }
+    const correctDetails = { username: 'demo-user-2', password: 'password', confirmPassword: 'password' }
 
     describe('sign up for an account', () => {
       test('POST /signup - 422 if input error (username)', async () => {
@@ -76,6 +76,19 @@ describe('user client ops', () => {
           })
           expect(response.status).toBe(422)
           expect(response.body.errors).toEqual([{ ...passwordError, path: 'password' }])
+        }))
+      })
+
+      test('POST /signup - 422 if input error (confirm password)', async () => {
+        await Promise.all([
+          { value: '', msg: 'Please confirm your password.' },
+          { value: 'a', msg: 'Both passwords do not match.' }
+        ].map(async passwordError => {
+          const response = await reqShort('/signup', 'post', null, {
+            ...correctDetails, confirmPassword: passwordError.value
+          })
+          expect(response.status).toBe(422)
+          expect(response.body.errors).toEqual([{ ...passwordError, path: 'confirmPassword' }])
         }))
       })
 
@@ -154,7 +167,10 @@ describe('user client ops', () => {
 
   describe('change own user account details', () => {
     const correctDetails = {
-      username: 'cool-username', newPassword: 'coolNewPassword', confirmPassword: 'password'
+      username: 'cool-username',
+      newPassword: 'coolNewPassword',
+      confirmNewPassword: 'coolNewPassword',
+      currentPassword: 'password'
     }
 
     test('POST /user/:id - 404 if target user does not exist', async () => {
@@ -187,21 +203,43 @@ describe('user client ops', () => {
       }])
     })
 
-    test('POST /user/:id - 422 if input error (confirm password)', async () => {
+    test('POST /signup - 422 if input error (confirm new password)', async () => {
       await Promise.all([
-        { value: '', msg: 'Please confirm your current password.' },
-        { value: 'blah', msg: 'Incorrect password.' }
+        { value: '', msg: 'Please confirm your new password.' },
+        { value: 'a', msg: 'Both passwords do not match.' }
       ].map(async passwordError => {
         const response = await reqShort('/user/demo-user-2', 'put', token, {
-          ...correctDetails, confirmPassword: passwordError.value
+          ...correctDetails, confirmNewPassword: passwordError.value
         })
         expect(response.status).toBe(422)
-        expect(response.body.errors).toEqual([{ ...passwordError, path: 'confirmPassword' }])
+        expect(response.body.errors).toEqual([{ ...passwordError, path: 'confirmNewPassword' }])
       }))
     })
 
-    test('POST /user/:id - 200 and safely changes account details', async () => {
-      const response = await reqShort('/user/demo-user-2', 'put', token, correctDetails)
+    test('POST /user/:id - 422 if input error (current password)', async () => {
+      await Promise.all([
+        { value: '', msg: 'Please input your current password in order to use your new password.' },
+        { value: 'blah', msg: 'Incorrect password.' }
+      ].map(async passwordError => {
+        const response = await reqShort('/user/demo-user-2', 'put', token, {
+          ...correctDetails, currentPassword: passwordError.value
+        })
+        expect(response.status).toBe(422)
+        expect(response.body.errors).toEqual([{ ...passwordError, path: 'currentPassword' }])
+      }))
+    })
+
+    test('POST /user/:id - 200 and changes username', async () => {
+      const response = await reqShort('/user/demo-user-2', 'put', token, {
+        username: 'cool-username'
+      })
+      expect(response.status).toBe(200)
+      const user = await User.findByNameOrId('cool-username')
+      expect(user).toBeDefined()
+    })
+
+    test('POST /user/:id - 200 and safely changes password', async () => {
+      const response = await reqShort('/user/cool-username', 'put', token, correctDetails)
       expect(response.status).toBe(200)
       let user = await User.findByNameOrId('cool-username')
       user = assertDefined<IUserDocument>(user)
