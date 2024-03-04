@@ -1,36 +1,6 @@
-import request, { type Response } from 'supertest'
-import app from './appTesting'
 import './mongoConfigTesting'
+import { assertDefined, reqShort, validationLoop } from './helpers'
 import User, { type IUserDocument } from '../models/user'
-
-const assertDefined = <T>(obj: T | null | undefined): T => {
-  expect(obj).toBeDefined()
-  return obj as T
-}
-
-const reqShort = async (
-  url: string,
-  method?: string | null,
-  token?: string | null,
-  form?: Record<string, string> | null
-): Promise<Response> => {
-  switch (method) {
-    case 'post': return await request(app)
-      .post(url)
-      .set({ Authorization: token !== null ? `Bearer ${token}` : '' })
-      .type('form').send(form ?? {})
-    case 'put': return await request(app)
-      .put(url)
-      .set({ Authorization: token !== null ? `Bearer ${token}` : '' })
-      .type('form').send(form ?? {})
-    case 'delete': return await request(app)
-      .delete(url)
-      .set({ Authorization: token !== null ? `Bearer ${token}` : '' })
-    default: return await request(app)
-      .get(url)
-      .set({ Authorization: token !== null ? `Bearer ${token}` : '' })
-  }
-}
 
 describe('user client ops', () => {
   let token: string
@@ -47,43 +17,45 @@ describe('user client ops', () => {
   })
 
   describe('auth', () => {
-    const correctDetails = { username: 'demo-user-2', password: 'password', confirmPassword: 'password' }
+    const correctDetails = {
+      username: 'demo-user-2',
+      password: 'password',
+      confirmPassword: 'password'
+    }
 
     describe('sign up for an account', () => {
+      const validationLoopCall = async (
+        fieldName: string,
+        errorArray: Array<{ value: string, msg: string }>
+      ): Promise<void> => {
+        await validationLoop(
+          fieldName, errorArray,
+          correctDetails, '/signup', 'post', null
+        )
+      }
+
       test('POST /signup - 422 if input error (username)', async () => {
-        await Promise.all(usernameErrors.map(async usernameError => {
-          const response = await reqShort('/signup', 'post', null, {
-            ...correctDetails, username: usernameError.value
-          })
-          expect(response.status).toBe(422)
-          expect(response.body.errors).toEqual([{ ...usernameError, path: 'username' }])
-        }))
+        await validationLoopCall('username', usernameErrors)
       })
 
       test('POST /signup - 422 if input error (password)', async () => {
-        await Promise.all([
-          { value: '', msg: 'Please enter a password.' },
-          { value: 'a', msg: 'Password must be at least 8 characters long.' }
-        ].map(async passwordError => {
-          const response = await reqShort('/signup', 'post', null, {
-            ...correctDetails, password: passwordError.value
-          })
-          expect(response.status).toBe(422)
-          expect(response.body.errors).toEqual([{ ...passwordError, path: 'password' }])
-        }))
+        await validationLoopCall(
+          'password',
+          [
+            { value: '', msg: 'Please enter a password.' },
+            { value: 'a', msg: 'Password must be at least 8 characters long.' }
+          ]
+        )
       })
 
       test('POST /signup - 422 if input error (confirm password)', async () => {
-        await Promise.all([
-          { value: '', msg: 'Please confirm your password.' },
-          { value: 'a', msg: 'Both passwords do not match.' }
-        ].map(async passwordError => {
-          const response = await reqShort('/signup', 'post', null, {
-            ...correctDetails, confirmPassword: passwordError.value
-          })
-          expect(response.status).toBe(422)
-          expect(response.body.errors).toEqual([{ ...passwordError, path: 'confirmPassword' }])
-        }))
+        await validationLoopCall(
+          'confirmPassword',
+          [
+            { value: '', msg: 'Please confirm your password.' },
+            { value: 'a', msg: 'Both passwords do not match.' }
+          ]
+        )
       })
 
       test('POST /signup - 200 and new account created', async () => {
@@ -95,27 +67,31 @@ describe('user client ops', () => {
     })
 
     describe('log into an account', () => {
+      const validationLoopCall = async (
+        fieldName: string,
+        errorArray: Array<{ value: string, msg: string }>
+      ): Promise<void> => {
+        await validationLoop(
+          fieldName, errorArray,
+          correctDetails, '/login', 'post', null
+        )
+      }
+
       test('POST /login - 422 if input error (username)', async () => {
-        const response = await reqShort('/login', 'post', null, {
-          ...correctDetails, username: ''
-        })
-        expect(response.status).toBe(422)
-        expect(response.body.errors).toEqual([{
-          path: 'username', value: '', msg: 'Please enter a username.'
-        }])
+        await validationLoopCall(
+          'username',
+          [{ value: '', msg: 'Please enter a username.' }]
+        )
       })
 
       test('POST /login - 422 if input error (password)', async () => {
-        await Promise.all([
-          { value: '', msg: 'Please enter a password.' },
-          { value: 'blah', msg: 'Incorrect username or password.' }
-        ].map(async passwordError => {
-          const response = await reqShort('/login', 'post', null, {
-            ...correctDetails, password: passwordError.value
-          })
-          expect(response.status).toBe(422)
-          expect(response.body.errors).toEqual([{ ...passwordError, path: 'password' }])
-        }))
+        await validationLoopCall(
+          'password',
+          [
+            { value: '', msg: 'Please enter a password.' },
+            { value: 'blah', msg: 'Incorrect username or password.' }
+          ]
+        )
       })
 
       test('POST /login - 200 and token given', async () => {
@@ -167,6 +143,15 @@ describe('user client ops', () => {
       currentPassword: 'password'
     }
 
+    const validationLoopCall = async (
+      fieldName: string,
+      errorArray: Array<{ value: string, msg: string }>
+    ): Promise<void> => {
+      await validationLoop(
+        fieldName, errorArray,
+        correctDetails, '/user/demo-user-2', 'put', token)
+    }
+
     test('POST /user/:id - 404 if target user does not exist', async () => {
       const response = await reqShort('/user/demo-user-0', 'put', token, {})
       expect(response.status).toBe(404)
@@ -178,49 +163,34 @@ describe('user client ops', () => {
     })
 
     test('POST /user/:id - 422 if input error (username)', async () => {
-      await Promise.all(usernameErrors.map(async usernameError => {
-        const response = await reqShort('/user/demo-user-2', 'put', token, {
-          username: usernameError.value
-        })
-        expect(response.status).toBe(422)
-        expect(response.body.errors).toEqual([{ ...usernameError, path: 'username' }])
-      }))
+      await validationLoopCall('username', usernameErrors)
     })
 
     test('POST /user/:id - 422 if input error (new password)', async () => {
-      const response = await reqShort('/user/demo-user-2', 'put', token, {
-        ...correctDetails, newPassword: 'a'
-      })
-      expect(response.status).toBe(422)
-      expect(response.body.errors).toEqual([{
-        path: 'newPassword', value: 'a', msg: 'New password must be 8 or more characters long.'
-      }])
+      await validationLoopCall(
+        'newPassword',
+        [{ value: 'a', msg: 'New password must be 8 or more characters long.' }]
+      )
     })
 
-    test('POST /signup - 422 if input error (confirm new password)', async () => {
-      await Promise.all([
-        { value: '', msg: 'Please confirm your new password.' },
-        { value: 'a', msg: 'Both passwords do not match.' }
-      ].map(async passwordError => {
-        const response = await reqShort('/user/demo-user-2', 'put', token, {
-          ...correctDetails, confirmNewPassword: passwordError.value
-        })
-        expect(response.status).toBe(422)
-        expect(response.body.errors).toEqual([{ ...passwordError, path: 'confirmNewPassword' }])
-      }))
+    test('POST /user/:id - 422 if input error (confirm new password)', async () => {
+      await validationLoopCall(
+        'confirmNewPassword',
+        [
+          { value: '', msg: 'Please confirm your new password.' },
+          { value: 'a', msg: 'Both passwords do not match.' }
+        ]
+      )
     })
 
     test('POST /user/:id - 422 if input error (current password)', async () => {
-      await Promise.all([
-        { value: '', msg: 'Please input your current password in order to use your new password.' },
-        { value: 'blah', msg: 'Incorrect password.' }
-      ].map(async passwordError => {
-        const response = await reqShort('/user/demo-user-2', 'put', token, {
-          ...correctDetails, currentPassword: passwordError.value
-        })
-        expect(response.status).toBe(422)
-        expect(response.body.errors).toEqual([{ ...passwordError, path: 'currentPassword' }])
-      }))
+      await validationLoopCall(
+        'currentPassword',
+        [
+          { value: '', msg: 'Please input your current password in order to use your new password.' },
+          { value: 'blah', msg: 'Incorrect password.' }
+        ]
+      )
     })
 
     test('POST /user/:id - 200 and changes username', async () => {
