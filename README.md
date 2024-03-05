@@ -11,7 +11,4 @@ This template comes with a User object model and controller, and endpoints for u
 - Functionality enforced with Jest + Supertest testing
 
 ## Todo
-- Generate an _actually_ secret secret for password decrypting/encrypting
-- Consider adding JWT refreshing
 - Create Frontend Template repo and link here
-- Improve error handling
