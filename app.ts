@@ -1,6 +1,11 @@
 // To successfully import a module: https://stackoverflow.com/questions/41292559/could-not-find-a-declaration-file-for-module-module-name-path-to-module-nam
 
-import express, { type Express } from 'express'
+import express, {
+  type Express,
+  type NextFunction,
+  type Request,
+  type Response
+} from 'express'
 import mongoose from 'mongoose'
 import morgan from 'morgan'
 import cors from 'cors'
@@ -26,6 +31,24 @@ app.use(express.json())
 app.use(express.urlencoded({ extended: false }))
 
 app.use(router)
+
+app.use(function (req, res, next) {
+  res.sendStatus(404)
+})
+
+app.use((
+  err: Error,
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  console.error(err.stack)
+  if ('statusCode' in err && typeof err.statusCode === 'number') {
+    res.status(err.statusCode).send(err.message)
+  } else {
+    res.status(500).send('Something went wrong.')
+  }
+})
 
 if (port !== undefined) {
   app.listen(port, () => {
