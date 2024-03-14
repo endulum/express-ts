@@ -65,7 +65,10 @@ userController.areYouThisUser = asyncHandler(async (req, res, next) => {
 userController.getUser = [
   userController.doesUserExist,
   asyncHandler(async (req, res) => {
-    res.status(200).json({ username: req.requestedUser.username })
+    res.status(200).json({
+      username: req.requestedUser.username,
+      id: req.requestedUser.id
+    })
   })
 ]
 
