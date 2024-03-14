@@ -2,11 +2,14 @@ import { type RequestHandler } from 'express'
 import jsonwebtoken from 'jsonwebtoken'
 import asyncHandler from 'express-async-handler'
 import { type ValidationChain, body, validationResult } from 'express-validator'
+import 'dotenv/config'
 import User from '../models/user'
 
 interface IJwtPayload extends jsonwebtoken.JwtPayload {
   id: string
 }
+
+const secret: string | undefined = process.env.SECRET
 
 const sendErrorsIfAny = asyncHandler(async (req, res, next) => {
   const errorsArray = validationResult(req).array()
@@ -34,7 +37,8 @@ userController.authenticate = asyncHandler(async (req, res, next) => {
   else {
     let decoded
     try {
-      decoded = jsonwebtoken.verify(bearerToken, 'secret') as IJwtPayload
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+      decoded = jsonwebtoken.verify(bearerToken, secret!) as IJwtPayload
       const user = await User.findByNameOrId(decoded.id)
       if (user === null) res.status(404).send('The user this token belongs to could not be found.')
       else {
@@ -143,7 +147,8 @@ userController.logIn = [
   asyncHandler(async (req, res) => {
     const token = jsonwebtoken.sign(
       { username: req.loggingInUser.username, id: req.loggingInUser.id },
-      'secret' // MAKE THIS ACTUALLY SECRET
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+      secret!
     )
     res.status(200).json({ token })
   })

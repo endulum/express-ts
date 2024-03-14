@@ -16,13 +16,16 @@ import router from './routes'
 const app: Express = express()
 const port: string | undefined = process.env.PORT
 const uri: string | undefined = process.env.CONNECTION
+const secret: string | undefined = process.env.SECRET
+
+if (secret === undefined) throw new Error('JWT secret is not defined.')
 
 if (uri !== undefined) {
   void mongoose.connect(uri)
   const db = mongoose.connection
   db.on('open', console.log.bind(console, 'mongo server connected'))
   db.on('error', console.error.bind(console, 'mongo connection error'))
-}
+} else throw new Error('Mongoose URI is not defined.')
 
 app.use(cors())
 app.use(morgan('dev'))
@@ -56,4 +59,4 @@ if (port !== undefined) {
   app.listen(port, () => {
     console.log(`⚡️ server is running at http://localhost:${port}`)
   })
-}
+} else throw new Error('Port is not defined.')
