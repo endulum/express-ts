@@ -18,8 +18,7 @@ const port: string | undefined = process.env.PORT
 const uri: string | undefined = process.env.CONNECTION
 
 if (uri !== undefined) {
-  // eslint-disable-next-line @typescript-eslint/no-floating-promises
-  mongoose.connect(uri)
+  void mongoose.connect(uri)
   const db = mongoose.connection
   db.on('open', console.log.bind(console, 'mongo server connected'))
   db.on('error', console.error.bind(console, 'mongo connection error'))
@@ -29,6 +28,9 @@ app.use(cors())
 app.use(morgan('dev'))
 app.use(express.json())
 app.use(express.urlencoded({ extended: false }))
+
+// toggle this on and off to simulate latency when needed
+// app.use((req, res, next) => setTimeout(next, 750))
 
 app.use(router)
 
