@@ -1,5 +1,5 @@
 import '../mongo/mongoConfigTesting'
-import { assertDefined, reqShort, ValidationLoopWrapper } from './helpers'
+import { assertDefined, reqShort, ValidationLoopWrapper } from './testHelpers'
 import User, { type IUserDocument } from '../models/user'
 
 describe('user client ops', () => {
@@ -9,16 +9,16 @@ describe('user client ops', () => {
     { value: '', msg: 'Please enter a username.' },
     { value: 'a', msg: 'Username must be between 2 and 32 characters long.' },
     { value: '&&&&', msg: 'Username must only consist of letters, numbers, and hyphens.' },
-    { value: 'demo-user-1', msg: 'A user already exists with this username.' }
+    { value: 'test-user-1', msg: 'A user already exists with this username.' }
   ]
 
   beforeAll(async () => {
-    await User.create({ username: 'demo-user-1', password: 'password' })
+    await User.create({ username: 'test-user-1', password: 'password' })
   })
 
   describe('auth', () => {
     const correctDetails = {
-      username: 'demo-user-2',
+      username: 'test-user-2',
       password: 'password',
       confirmPassword: 'password'
     }
@@ -56,7 +56,7 @@ describe('user client ops', () => {
       test('POST /signup - 200 and new account created', async () => {
         const response = await reqShort('/signup', 'post', null, correctDetails)
         expect(response.status).toBe(200)
-        const user = await User.findByNameOrId('demo-user-2')
+        const user = await User.findByNameOrId('test-user-2')
         expect(user).toBeDefined()
       })
     })
@@ -114,12 +114,12 @@ describe('user client ops', () => {
 
   describe('view a user profile', () => {
     test('GET /user/:id - 404 if user does not exist', async () => {
-      const response = await reqShort('/user/demo-user-0', 'get')
+      const response = await reqShort('/user/test-user-0', 'get')
       expect(response.status).toBe(404)
     })
 
     test('GET /user/:id - 200 and returns user details', async () => {
-      const response = await reqShort('/user/demo-user-2', 'get')
+      const response = await reqShort('/user/test-user-2', 'get')
       expect(response.status).toBe(200)
       expect(response.body).toHaveProperty('username')
     })
@@ -135,16 +135,16 @@ describe('user client ops', () => {
 
     let editUserLoop: ValidationLoopWrapper
     beforeAll(() => {
-      editUserLoop = new ValidationLoopWrapper(correctDetails, '/user/demo-user-2', 'put', token)
+      editUserLoop = new ValidationLoopWrapper(correctDetails, '/user/test-user-2', 'put', token)
     })
 
     test('POST /user/:id - 404 if target user does not exist', async () => {
-      const response = await reqShort('/user/demo-user-0', 'put', token, {})
+      const response = await reqShort('/user/test-user-0', 'put', token, {})
       expect(response.status).toBe(404)
     })
 
     test('POST /user/:id - 403 if target user != authenticated user', async () => {
-      const response = await reqShort('/user/demo-user-1', 'put', token, {})
+      const response = await reqShort('/user/test-user-1', 'put', token, {})
       expect(response.status).toBe(403)
     })
 
@@ -180,7 +180,7 @@ describe('user client ops', () => {
     })
 
     test('POST /user/:id - 200 and changes username', async () => {
-      const response = await reqShort('/user/demo-user-2', 'put', token, {
+      const response = await reqShort('/user/test-user-2', 'put', token, {
         username: 'cool-username'
       })
       expect(response.status).toBe(200)

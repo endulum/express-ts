@@ -1,15 +1,10 @@
 // To successfully import a module: https://stackoverflow.com/questions/41292559/could-not-find-a-declaration-file-for-module-module-name-path-to-module-nam
 
-import express, {
-  type Express,
-  type NextFunction,
-  type Request,
-  type Response
-} from 'express'
+import express from 'express'
 import morgan from 'morgan'
 import cors from 'cors'
 import 'dotenv/config'
-
+import { errorHandler } from './middleware/errorHandler'
 import router from './routes'
 
 // // FOR MEMORY SERVER
@@ -18,7 +13,7 @@ import router from './routes'
 // import init from './mongo/mongoConfig'
 // void init()
 
-const app: Express = express()
+const app = express()
 
 const port: string | undefined = process.env.PORT
 if (port === undefined) throw new Error('Port is not defined.')
@@ -40,19 +35,7 @@ app.use(function (req, res, next) {
   res.sendStatus(404)
 })
 
-app.use((
-  err: Error,
-  req: Request,
-  res: Response,
-  next: NextFunction
-): void => {
-  console.error(err.stack)
-  if ('statusCode' in err && typeof err.statusCode === 'number') {
-    res.status(err.statusCode).send(err.message)
-  } else {
-    res.sendStatus(500)
-  }
-})
+app.use(errorHandler)
 
 app.listen(port, () => {
   console.log(`⚡️ server is running at http://localhost:${port}`)
