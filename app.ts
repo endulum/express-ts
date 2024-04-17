@@ -14,18 +14,18 @@ import 'dotenv/config'
 import router from './routes'
 
 const app: Express = express()
-const port: string | undefined = process.env.PORT
-const uri: string | undefined = process.env.CONNECTION
-const secret: string | undefined = process.env.SECRET
 
+const port: string | undefined = process.env.PORT
+if (port === undefined) throw new Error('Port is not defined.')
+const uri: string | undefined = process.env.CONNECTION
+if (uri === undefined) throw new Error('Mongoose URI is not defined.')
+const secret: string | undefined = process.env.SECRET
 if (secret === undefined) throw new Error('JWT secret is not defined.')
 
-if (uri !== undefined) {
-  void mongoose.connect(uri)
-  const db = mongoose.connection
-  db.on('open', console.log.bind(console, 'mongo server connected'))
-  db.on('error', console.error.bind(console, 'mongo connection error'))
-} else throw new Error('Mongoose URI is not defined.')
+mongoose.connect(uri).catch(err => { console.error(err) })
+const db = mongoose.connection
+db.on('open', console.log.bind(console, 'mongo server connected'))
+db.on('error', console.error.bind(console, 'mongo connection error'))
 
 app.use(cors())
 app.use(morgan('dev'))
@@ -51,12 +51,10 @@ app.use((
   if ('statusCode' in err && typeof err.statusCode === 'number') {
     res.status(err.statusCode).send(err.message)
   } else {
-    res.status(500).send('Something went wrong.')
+    res.sendStatus(500)
   }
 })
 
-if (port !== undefined) {
-  app.listen(port, () => {
-    console.log(`⚡️ server is running at http://localhost:${port}`)
-  })
-} else throw new Error('Port is not defined.')
+app.listen(port, () => {
+  console.log(`⚡️ server is running at http://localhost:${port}`)
+})
