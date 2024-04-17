@@ -6,26 +6,25 @@ import express, {
   type Request,
   type Response
 } from 'express'
-import mongoose from 'mongoose'
 import morgan from 'morgan'
 import cors from 'cors'
 import 'dotenv/config'
 
 import router from './routes'
 
+// // FOR MEMORY SERVER
+// import init from './mongo/mongoConfigTesting'
+// // FOR PROD SERVER
+// import init from './mongo/mongoConfig'
+// void init()
+
 const app: Express = express()
 
 const port: string | undefined = process.env.PORT
 if (port === undefined) throw new Error('Port is not defined.')
-const uri: string | undefined = process.env.CONNECTION
-if (uri === undefined) throw new Error('Mongoose URI is not defined.')
+
 const secret: string | undefined = process.env.SECRET
 if (secret === undefined) throw new Error('JWT secret is not defined.')
-
-mongoose.connect(uri).catch(err => { console.error(err) })
-const db = mongoose.connection
-db.on('open', console.log.bind(console, 'mongo server connected'))
-db.on('error', console.error.bind(console, 'mongo connection error'))
 
 app.use(cors())
 app.use(morgan('dev'))

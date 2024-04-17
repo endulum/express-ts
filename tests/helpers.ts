@@ -51,7 +51,7 @@ export const validationLoop = async (
   }))
 }
 
-// in describe blocks were the details, url, method, and token will always be the same,
+// in describe blocks where the details, url, method, and token will always be the same,
 // this wrapper does away with the four repetitive arguments, leaving only two
 export class ValidationLoopWrapper {
   correctDetails: Record<string, string>

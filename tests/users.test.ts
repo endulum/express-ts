@@ -1,4 +1,4 @@
-import './mongoConfigTesting'
+import '../mongo/mongoConfigTesting'
 import { assertDefined, reqShort, ValidationLoopWrapper } from './helpers'
 import User, { type IUserDocument } from '../models/user'
 
