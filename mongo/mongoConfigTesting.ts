@@ -4,7 +4,7 @@ import preload from './memoryServerPreload'
 
 let mongoServer: MongoMemoryServer
 
-async function init (): Promise<void> {
+async function init (doPreload?: boolean): Promise<void> {
   mongoServer = await MongoMemoryServer.create()
   const mongoUri = mongoServer.getUri()
 
@@ -13,9 +13,11 @@ async function init (): Promise<void> {
   const db = mongoose.connection
   db.on('open', () => {
     console.log('mongo memory server connected')
-    preload()
-      .then(() => { console.log('memory preload complete') })
-      .catch((err) => { console.error(err) })
+    if (doPreload === true) {
+      preload()
+        .then(() => { console.log('memory preload complete') })
+        .catch((err) => { console.error(err) })
+    }
   })
   db.on('error', (err) => {
     if (err.message.code === 'ETIMEOUT') {

@@ -7,8 +7,9 @@ import 'dotenv/config'
 import { errorHandler } from './middleware/errorHandler'
 import router from './routes'
 
-// // FOR MEMORY SERVER
-// import init from './mongo/mongoConfigTesting'
+// FOR MEMORY SERVER
+import init from './mongo/mongoConfigTesting'
+void init(true)
 // // FOR PROD SERVER
 // import init from './mongo/mongoConfig'
 // void init()
