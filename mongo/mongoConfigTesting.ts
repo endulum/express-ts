@@ -12,7 +12,9 @@ async function init (doPreload?: boolean): Promise<void> {
 
   const db = mongoose.connection
   db.on('open', () => {
-    console.log('mongo memory server connected')
+    if (process.env.JEST_WORKER_ID === undefined) {
+      console.log('mongo memory server connected')
+    }
     if (doPreload === true) {
       preload()
         .then(() => { console.log('memory preload complete') })
