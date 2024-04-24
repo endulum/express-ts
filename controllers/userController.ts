@@ -30,7 +30,7 @@ userController.authenticate = asyncHandler(async (req, res, next) => {
       if (user === null) {
         res.status(404).send('The user this token belongs to could not be found.')
       } else {
-        req.authenticatedUser = user
+        req.authUser = user
         next()
       }
     } catch (err) {
@@ -43,13 +43,13 @@ userController.doesUserExist = asyncHandler(async (req, res, next) => {
   const user = await User.findByNameOrId(req.params.id)
   if (user === null) res.status(404).send('User not found.')
   else {
-    req.requestedUser = user
+    req.reqUser = user
     next()
   }
 })
 
 userController.areYouThisUser = asyncHandler(async (req, res, next) => {
-  if (req.requestedUser.id !== req.authenticatedUser.id) {
+  if (req.reqUser.id !== req.authUser.id) {
     res.status(403).send('You are not this user.')
   } else next()
 })
@@ -58,8 +58,8 @@ userController.getUser = [
   userController.doesUserExist,
   asyncHandler(async (req, res) => {
     res.status(200).json({
-      username: req.requestedUser.username,
-      id: req.requestedUser.id
+      username: req.reqUser.username,
+      id: req.reqUser.id
     })
   })
 ]
@@ -73,8 +73,8 @@ const usernameValidation = body('username')
     const existingUser = await User.findByNameOrId(value)
     if (existingUser !== null) {
       if (
-        req.authenticatedUser !== null &&
-        req.authenticatedUser.id === existingUser.id
+        req.authUser !== null &&
+        req.authUser.id === existingUser.id
       ) { // only when logged in and choosing a new username
         return true
       } return await Promise.reject(new Error())
@@ -97,7 +97,9 @@ userController.signUp = [
     .trim()
     .isLength({ min: 1 }).withMessage('Please confirm your password.').bail()
     .custom(async (value, { req }) => {
-      return value === req.body.password ? true : await Promise.reject(new Error())
+      return value === req.body.password
+        ? true
+        : await Promise.reject(new Error())
     }).withMessage('Both passwords do not match.')
     .escape(),
 
@@ -124,9 +126,11 @@ userController.logIn = [
     .custom(async (value: string, { req }) => {
       const existingUser = await User.findByNameOrId(req.body.username as string)
       if (existingUser === null) return await Promise.reject(new Error())
-      req.loggingInUser = existingUser
-      const match: boolean = await req.loggingInUser.checkPassword(value)
-      return match ? true : await Promise.reject(new Error())
+      const match: boolean = await existingUser.checkPassword(value)
+      if (match) {
+        req.thisUser = existingUser
+        return true
+      } return await Promise.reject(new Error())
     }).withMessage('Incorrect username or password.')
     .escape(),
 
@@ -135,7 +139,7 @@ userController.logIn = [
   asyncHandler(async (req, res) => {
     if (secret === undefined) throw new Error('JWT secret is not defined.')
     const token = jsonwebtoken.sign(
-      { username: req.loggingInUser.username, id: req.loggingInUser.id }, secret
+      { username: req.thisUser.username, id: req.thisUser.id }, secret
     )
     res.status(200).json({ token })
   })
@@ -147,8 +151,9 @@ userController.editUser = [
   body('newPassword')
     .trim()
     .custom(async value => {
-      if (value.length > 0 && value.length < 8) return await Promise.reject(new Error())
-      return true
+      return (value.length > 0 && value.length < 8)
+        ? await Promise.reject(new Error())
+        : true
     }).withMessage('New password must be 8 or more characters long.')
     .escape(),
 
@@ -157,22 +162,30 @@ userController.editUser = [
   body('confirmNewPassword')
     .trim()
     .custom(async (value, { req }) => {
-      return (req.body.newPassword !== '' && value.length === 0) ? await Promise.reject(new Error()) : true
+      return (req.body.newPassword !== '' && value.length === 0)
+        ? await Promise.reject(new Error())
+        : true
     }).withMessage('Please confirm your new password.').bail()
     .custom(async (value, { req }) => {
-      return value === req.body.newPassword ? true : await Promise.reject(new Error())
+      return value === req.body.newPassword
+        ? true
+        : await Promise.reject(new Error())
     }).withMessage('Both passwords do not match.')
     .escape(),
 
   body('currentPassword')
     .trim()
     .custom(async (value, { req }) => {
-      return (req.body.newPassword !== '' && value.length === 0) ? await Promise.reject(new Error()) : true
+      return (req.body.newPassword !== '' && value.length === 0)
+        ? await Promise.reject(new Error())
+        : true
     }).withMessage('Please input your current password in order to use your new password.').bail()
     .custom(async (value, { req }) => {
       if (req.body.newPassword !== '') {
-        const match: boolean = await req.authenticatedUser.checkPassword(value)
-        return match ? true : await Promise.reject(new Error())
+        const match: boolean = await req.authUser.checkPassword(value)
+        return match
+          ? true
+          : await Promise.reject(new Error())
       }
     }).withMessage('Incorrect password.')
     .escape(),
@@ -180,9 +193,9 @@ userController.editUser = [
   sendErrorsIfAny,
 
   asyncHandler(async (req, res) => {
-    req.authenticatedUser.username = req.body.username
-    if (req.body.newPassword !== '') req.authenticatedUser.password = req.body.newPassword
-    await req.authenticatedUser.save()
+    req.authUser.username = req.body.username
+    if (req.body.newPassword !== '') req.authUser.password = req.body.newPassword
+    await req.authUser.save()
     res.sendStatus(200)
   })
 ]

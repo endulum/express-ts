@@ -19,8 +19,8 @@ router.route('/signup')
 router.route('/login')
   .get(userController.authenticate, asyncHandler(async (req, res, next) => {
     res.status(200).json({
-      username: req.authenticatedUser.username,
-      id: req.authenticatedUser.id
+      username: req.authUser.username,
+      id: req.authUser.id
     })
   }))
   .post(userController.logIn)
