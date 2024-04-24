@@ -7,7 +7,7 @@
     "test": "jest --watch",
     "start": "node dist/app.js",
     "dev": "nodemon --exec 'ts-node --files' app.ts",
-    "reset": "ts-node resetdb.ts"
+    "empty-db": "ts-node empty-db.ts"
   },
   "keywords": [],
   "author": "",
