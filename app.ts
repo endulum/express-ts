@@ -27,7 +27,7 @@ app.use(morgan('dev'))
 app.use(express.json())
 app.use(express.urlencoded({ extended: false }))
 
-// toggle this on and off to simulate latency when needed
+// toggle this to simulate latency
 // app.use((req, res, next) => setTimeout(next, 750))
 
 app.use(router)
